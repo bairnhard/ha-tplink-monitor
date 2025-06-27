@@ -1,7 +1,7 @@
 {
     "name": "TP-Link Switch Bandwidth Monitor",    
     "filename": "manifest.json",
-    "homeassistant": "2023.1.0",
+    "homeassistant": "2023.3.0",
     "render_readme": true,
     "zip_release": false
 }

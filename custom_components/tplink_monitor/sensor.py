@@ -50,12 +50,23 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
 
     _LOGGER.info(f"✅ Device registered: {device_entry.name}")
 
-    # Wait for first coordinator update
+    # Wait for first coordinator update to get port data
     await coordinator.async_config_entry_first_refresh()
 
-    # Add sensors (ports)
-    sensors = [TplinkPortSensor(coordinator, port, system_info["mac_address"]) for port in range(1, 17)]
+    # Dynamically detect available ports from the actual data
+    available_ports = []
+    if coordinator.data:
+        available_ports = list(coordinator.data.keys())
+        _LOGGER.info(f"🔍 Detected {len(available_ports)} ports: {sorted(available_ports)}")
+    else:
+        _LOGGER.warning("⚠️ No port data available, falling back to default 16 ports")
+        available_ports = list(range(1, 17))  # Fallback to 16 ports
+
+    # Create sensors only for detected/available ports
+    sensors = [TplinkPortSensor(coordinator, port, system_info["mac_address"]) for port in available_ports]
     async_add_entities(sensors, True)
+
+    _LOGGER.info(f"✅ Created {len(sensors)} port sensors for available ports")
 
 
 class TPLinkCoordinator(DataUpdateCoordinator):
@@ -75,6 +86,7 @@ class TPLinkCoordinator(DataUpdateCoordinator):
         self.password = password
         self.mtu = mtu
         self.system_info = None
+        self.detected_ports = set()  # Track detected ports
 
     async def _async_update_data(self):
         """Fetch latest switch statistics asynchronously using `requests`."""
@@ -82,6 +94,14 @@ class TPLinkCoordinator(DataUpdateCoordinator):
             port_stats = await self.hass.async_add_executor_job(
                 fetch_port_statistics, self.ip, self.username, self.password
             )
+            
+            # Track newly detected ports for logging
+            if port_stats:
+                new_ports = set(port_stats.keys()) - self.detected_ports
+                if new_ports:
+                    _LOGGER.info(f"🔍 New ports detected: {sorted(new_ports)}")
+                    self.detected_ports.update(new_ports)
+                    
         except Exception as e:
             _LOGGER.error(f"Error fetching port statistics: {e}")
             return None
@@ -122,6 +142,11 @@ class TplinkPortSensor(CoordinatorEntity, Entity):
         self._attr_state_class = "measurement"
 
     @property
+    def unique_id(self):
+        """Return a unique ID for this sensor."""
+        return f"{self._device_mac}_port_{self._port}"
+
+    @property
     def device_info(self) -> DeviceInfo:
         """Return device information for the TP-Link switch."""
         system_info = self.coordinator.system_info
@@ -139,6 +164,14 @@ class TplinkPortSensor(CoordinatorEntity, Entity):
             hw_version=system_info["hardware_version"],
             connections={(("mac", self._device_mac))},
             configuration_url=f"http://{system_info['ip_address']}",
+        )
+
+    @property
+    def available(self):
+        """Return True if the port data is available."""
+        return (
+            self.coordinator.data is not None 
+            and self._port in self.coordinator.data
         )
 
     @property
@@ -187,4 +220,3 @@ class TplinkPortSensor(CoordinatorEntity, Entity):
             "rx_mbps": round(self._rx_mbps, 2),
             "tx_mbps": round(self._tx_mbps, 2),
         }
-

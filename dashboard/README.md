@@ -3,9 +3,8 @@
 The TP-LINK integration can be used with [Flex Table Card](https://github.com/custom-cards/flex-table-card)
 to create a 8/16/24-port monitoring table for the TP-LINK Router
 
-YAML is provided for a sample dashboard that can be modified as needed.  The HACS 'card-mod 4' resource
-https://github.com/thomasloven/lovelace-card-mod is also used to add CSS needed to dynamically resize the 
-card to the width of the table.
+YAML is provided for a sample dashboard that can be modified as needed.  The HACS [card-mod 4](https://github.com/thomasloven/lovelace-card-mod) 
+resource is also used to add CSS needed to dynamically resize the card to the width of the table.
 
 ### Install Flex Table Card and Card Mod
 

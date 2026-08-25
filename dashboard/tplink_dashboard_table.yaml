@@ -31,3 +31,17 @@ columns:
       '; font-weight:' + (this.entity.attributes.link_status === 'Link Down' ?
       'normal' : 'bold') + ';">' + x*1000 + ' Kbps</span>'
 sort_by: Port
+card_mod:
+  style: |
+    :host {
+      width: fit-content !important;
+      min-width: fit-content !important;
+      max-width: none !important;
+    }
+    ha-card {
+      width: fit-content !important;
+      min-width: fit-content !important;
+      max-width: none !important;
+      overflow: visible !important;
+      box-sizing: content-box; /* Ensures padding doesn't restrict content */
+    }

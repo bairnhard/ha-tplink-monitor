@@ -1,0 +1,47 @@
+type: custom:flex-table-card
+title: TP-LINK Smart Switch
+entities:
+  include: sensor.tp_link_smart_switch_port_.*_bandwidth
+columns:
+  - name: Port
+    data: entity_id
+    modify: x.split('_port_')[1].split('_')[0]
+  - name: Name
+    data: port_name
+  - name: LinkStatus
+    data: link_status
+  - name: RX
+    data: rx_good
+    modify: >
+      '<span style="color:' + (this.entity.attributes.rx_bad > 0 ? 'red' :
+      'black') + ';">' + x + '</span>'
+  - name: TX
+    data: tx_good
+    modify: >
+      '<span style="color:' + (this.entity.attributes.tx_bad > 0 ? 'red' :
+      'black') + ';">' + x + '</span>'
+  - name: Bandwidth
+    data: state
+    modify: >
+      '<span style="color:' + (parseFloat(x) >= 4 ? 'red' :
+       parseFloat(x) >= 1 ? 'orange' :
+       parseFloat(x) >= 0.5 ? 'purple' :
+       parseFloat(x) > 0 ? 'green' :
+       'gray') +
+      '; font-weight:' + (this.entity.attributes.link_status === 'Link Down' ?
+      'normal' : 'bold') + ';">' + x*1000 + ' Kbps</span>'
+sort_by: Port
+card_mod:
+  style: |
+    :host {
+      width: fit-content !important;
+      min-width: fit-content !important;
+      max-width: none !important;
+    }
+    ha-card {
+      width: fit-content !important;
+      min-width: fit-content !important;
+      max-width: none !important;
+      overflow: visible !important;
+      box-sizing: content-box; /* Ensures padding doesn't restrict content */
+    }

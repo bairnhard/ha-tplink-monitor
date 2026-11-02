@@ -9,14 +9,18 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
 )
 from datetime import timedelta
-from .const import DOMAIN, CONF_IP, CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_MTU
+from .const import DOMAIN, CONF_IP, CONF_USERNAME, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_MTU, CONF_PORT_NAMES
 from .tplink_monitor import fetch_port_statistics, fetch_system_info
+
+# Port names are provided by config (CONF_PORT_NAMES) per-entry; do not hardcode here.
+
 
 _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
     """Set up TP-Link sensors from a config entry."""
-    config = hass.data[DOMAIN][entry.entry_id]
+    # Merge stored entry data and options (options override data)
+    config = {**hass.data[DOMAIN][entry.entry_id], **getattr(entry, "options", {})}
 
     ip = config[CONF_IP]
     username = config[CONF_USERNAME]
@@ -62,8 +66,24 @@ async def async_setup_entry(hass: HomeAssistant, entry, async_add_entities):
         _LOGGER.warning("⚠️ No port data available, falling back to default 16 ports")
         available_ports = list(range(1, 17))  # Fallback to 16 ports
 
+    # Normalize port names from config (may be list or comma-separated string)
+    port_names_raw = config.get(CONF_PORT_NAMES, []) or []
+    if isinstance(port_names_raw, str):
+        port_names = [n.strip() for n in port_names_raw.split(",") if n.strip()]
+    else:
+        port_names = list(port_names_raw)
+
+    _LOGGER.debug("Parsed port_names list (len=%d): %s", len(port_names), port_names)
+
     # Create sensors only for detected/available ports
-    sensors = [TplinkPortSensor(coordinator, port, system_info["mac_address"]) for port in available_ports]
+    sensors = []
+    for port in available_ports:
+        # Determine optional human-friendly name for this port (index 1-based)
+        port_name = port_names[port - 1] if len(port_names) >= port else None
+
+        # Bandwidth sensor
+        sensors.append(TplinkPortSensor(coordinator, port, system_info["mac_address"], port_name=port_name))
+
     async_add_entities(sensors, True)
 
     _LOGGER.info(f"✅ Created {len(sensors)} port sensors for available ports")
@@ -127,12 +147,16 @@ class TPLinkCoordinator(DataUpdateCoordinator):
 class TplinkPortSensor(CoordinatorEntity, Entity):
     """Representation of a TP-Link Switch Port Sensor."""
 
-    def __init__(self, coordinator, port, device_mac):
+    def __init__(self, coordinator, port, device_mac, port_name: str | None = None):
         """Initialize the sensor."""
         super().__init__(coordinator)
         self._port = port
         self._device_mac = device_mac  # Link this port to the device MAC
-        self._attr_name = f"Port {port} Bandwidth"
+        self._port_name = port_name
+        if port_name:
+            self._attr_name = f"Port {port} - {port_name} Bandwidth"
+        else:
+            self._attr_name = f"Port {port} - Bandwidth"
         self._prev_rx_good = None
         self._prev_tx_good = None
         self._rx_mbps = 0
@@ -219,4 +243,6 @@ class TplinkPortSensor(CoordinatorEntity, Entity):
             "tx_bad": data[self._port]["tx_bad"],
             "rx_mbps": round(self._rx_mbps, 2),
             "tx_mbps": round(self._tx_mbps, 2),
+            "port_name": (getattr(self, "_port_name", None) or ""),
         }
+
